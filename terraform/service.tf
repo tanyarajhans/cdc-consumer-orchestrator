@@ -3,7 +3,7 @@ resource "aws_ecs_service" "consumer_services" {
 
   name            = "${var.project_name}-${each.key}-service"
   cluster         = aws_ecs_cluster.main.id
-  task_definition = aws_ecs_task_definition.consumer_services[each.key].arn
+  task_definition = aws_ecs_task_definition.cdc_consumer_orchestrator[each.key].arn
   desired_count   = var.desired_count
   launch_type     = "FARGATE"
 
@@ -11,6 +11,10 @@ resource "aws_ecs_service" "consumer_services" {
     subnets          = aws_subnet.public[*].id
     security_groups  = [aws_security_group.ecs.id]
     assign_public_ip = true
+  }
+
+  lifecycle {
+    ignore_changes = [desired_count]
   }
 
   tags = {

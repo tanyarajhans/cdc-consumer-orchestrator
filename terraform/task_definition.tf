@@ -1,4 +1,4 @@
-resource "aws_ecs_task_definition" "consumer_services" {
+resource "aws_ecs_task_definition" "cdc_consumer_orchestrator" {
   for_each = toset(var.consumer_services)
 
   family                   = "${var.project_name}-${each.key}"
@@ -6,7 +6,7 @@ resource "aws_ecs_task_definition" "consumer_services" {
   memory                   = "512"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  execution_role_arn       = aws_iam_role.ecs_task_exec.arn
+  execution_role_arn       = aws_iam_role.cdc_consumer_orchestrator.arn
 
   container_definitions = jsonencode([
     {

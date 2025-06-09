@@ -4,7 +4,7 @@ variable "aws_region" {
 }
 
 variable "project_name" {
-  default = "cdc-consumer"
+  default = "cdc-orchestrator"
 }
 
 variable "vpc_cidr" {
@@ -24,7 +24,7 @@ variable "consumer_services" {
 }
 
 variable "desired_count" {
-  default = "2"
+  default = "1"
 }
 
 variable "max_capacity" {

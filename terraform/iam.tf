@@ -1,4 +1,4 @@
-data "aws_iam_policy_document" "ecs_task_assume" {
+data "aws_iam_policy_document" "cdc_consumer_orchestrator" {
   statement {
     actions = ["sts:AssumeRole"]
     principals {
@@ -8,12 +8,12 @@ data "aws_iam_policy_document" "ecs_task_assume" {
   }
 }
 
-resource "aws_iam_role" "ecs_task_exec" {
+resource "aws_iam_role" "cdc_consumer_orchestrator" {
   name               = "${var.project_name}-task-exec-role"
-  assume_role_policy = data.aws_iam_policy_document.ecs_task_assume.json
+  assume_role_policy = data.aws_iam_policy_document.cdc_consumer_orchestrator.json
 }
 
-resource "aws_iam_role_policy_attachment" "ecs_task_exec_attach" {
-  role       = aws_iam_role.ecs_task_exec.name
+resource "aws_iam_role_policy_attachment" "cdc_consumer_orchestrator" {
+  role       = aws_iam_role.cdc_consumer_orchestrator.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }

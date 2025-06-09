@@ -1,5 +1,5 @@
 resource "aws_security_group" "ecs" {
-  name        = "${var.project_name}-ecs-sg"
+  name        = "${var.project_name}-sg"
   description = "Security group for ECS tasks"
   vpc_id      = aws_vpc.main.id
 
@@ -20,6 +20,6 @@ resource "aws_security_group" "ecs" {
   }
 
   tags = {
-    Name = "${var.project_name}-ecs-sg"
+    Name = "${var.project_name}-sg"
   }
 }
