@@ -36,3 +36,8 @@ variable "min_capacity" {
   description = "Minimum capacity for auto scaling"
   default     = 1
 }
+
+variable "image_tag" {
+  description = "Tag to use for all consumer images (e.g. commit SHA)"
+  type        = string
+}

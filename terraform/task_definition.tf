@@ -11,17 +11,9 @@ resource "aws_ecs_task_definition" "cdc_consumer_orchestrator" {
   container_definitions = jsonencode([
     {
       name      = each.key
-      image     = "${aws_ecr_repository.cdc_consumer_orchestrator[each.key].repository_url}:latest"
+      image     = "${aws_ecr_repository.cdc_consumer_orchestrator[each.key].repository_url}:{var.image_tag}"
       essential = true
       command   = ["python", "main.py"]
-      logConfiguration = {
-        logDriver = "awslogs"
-        options = {
-          awslogs-group         = "/ecs/${each.key}"
-          awslogs-region        = var.aws_region
-          awslogs-stream-prefix = "consumer"
-        }
-      }
     }
   ])
 
