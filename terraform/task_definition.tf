@@ -15,7 +15,7 @@ resource "aws_ecs_task_definition" "cdc_consumer_orchestrator" {
       essential = true
       command   = ["python", "main.py"]
 
-      logConfiguration {
+      logConfiguration = {
         log_driver = "awslogs"
         options = {
           awslogs-group         = aws_cloudwatch_log_group.ecs_services[each.key].name
