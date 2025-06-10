@@ -8,21 +8,29 @@ resource "aws_ecs_task_definition" "cdc_consumer_orchestrator" {
   requires_compatibilities = ["FARGATE"]
   execution_role_arn       = aws_iam_role.cdc_consumer_orchestrator.arn
 
-  log_configuration {
-    log_driver = "awslogs"
-    options = {
-      awslogs-group         = "/ecs/cdc-consumer"
-      awslogs-region        = var.aws_region
-      awslogs-stream-prefix = "ecs"
-    }
-  }
-
   container_definitions = jsonencode([
     {
       name      = each.key
       image     = "${aws_ecr_repository.cdc_consumer_orchestrator[each.key].repository_url}:${var.image_tag}"
       essential = true
       command   = ["python", "main.py"]
+
+      logConfiguration {
+        log_driver = "awslogs"
+        options = {
+          awslogs-group         = aws_cloudwatch_log_group.ecs_services[each.key].name
+          awslogs-region        = var.aws_region
+          awslogs-stream-prefix = "ecs"
+        }
+      }
+
+      healthCheck = {
+        command = ["CMD-SHELL", "pgrep -f main.py || exit 1"]
+        interval = 30
+        timeout = 5
+        retries = 3
+        startPeriod = 60
+      }
     }
   ])
 
