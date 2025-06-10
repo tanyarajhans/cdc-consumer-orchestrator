@@ -16,7 +16,7 @@ resource "aws_ecs_task_definition" "cdc_consumer_orchestrator" {
       command   = ["python", "main.py"]
 
       logConfiguration = {
-        log_driver = "awslogs"
+        logDriver = "awslogs"
         options = {
           awslogs-group         = aws_cloudwatch_log_group.ecs_services[each.key].name
           awslogs-region        = var.aws_region
