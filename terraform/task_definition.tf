@@ -25,7 +25,7 @@ resource "aws_ecs_task_definition" "cdc_consumer_orchestrator" {
       }
 
       healthCheck = {
-        command     = ["CMD-SHELL", "pgrep -f main.py || exit 1"]
+        command     = ["CMD-SHELL", "ps aux | grep '[m]ain.py' || exit 1"]
         interval    = 30
         timeout     = 5
         retries     = 3

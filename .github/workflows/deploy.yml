@@ -1,6 +1,6 @@
 # This workflow deploys the CDC consumer applications to AWS using Terraform and Docker.
 # It builds Docker images for each consumer script, pushes them to ECR, and applies the Terraform configuration.
-# The workflow is triggered on pushes to the consumer-scripts or terraform directories.
+# The workflow is triggered on pushes to the main branch.
 # The AWS credentials and region are provided through GitHub secrets.
 # The consumer scripts are expected to be in the 'consumer_scripts' directory, and Terraform configurations in the 'terraform' directory.
 
@@ -19,62 +19,164 @@ env:
 
 jobs:
   deploy:
+    name: Deploy CDC Consumers
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
     steps:
-    - name: Checkout code
+    - name: 🚀 Checkout Repository
       uses: actions/checkout@v4
 
-    - name: Configure AWS Credentials
+    - name: 🔧 Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region:            ${{ env.AWS_REGION }}
-    
-    - name: Discover consumers and set image tag
-      id: discover_consumers_and_set_tag
-      run: |
-        CONSUMER_LIST=$(find consumer_scripts -maxdepth 1 -mindepth 1 -type d -exec basename {} \; | jq -R . | jq -s . | jq -c .)
 
-        echo "Found consumers: $CONSUMER_LIST"
+    - name: ✅ Verify AWS Connection
+      run: |
+        echo "🔍 Verifying AWS connection..."
+        aws sts get-caller-identity --output table
+        echo "✅ AWS connection verified"
+    
+    - name: 🔍 Discover Consumer Services
+      run: |
+        echo "📋 Discovering consumer services..."
+        
+        if [ ! -d "consumer_scripts" ]; then
+          echo "❌ ERROR: consumer_scripts directory not found!"
+          exit 1
+        fi
+        
+        CONSUMER_LIST=$(find consumer_scripts -maxdepth 1 -mindepth 1 -type d -exec basename {} \; | jq -R . | jq -s . | jq -c .)
+        CONSUMER_COUNT=$(echo $CONSUMER_LIST | jq length)
         IMAGE_TAG=${GITHUB_SHA::7}
 
-        echo "CONSUMER_LIST=$CONSUMER_LIST" >> $GITHUB_ENV
-        echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
-        echo "TF_VAR_consumer_services=$CONSUMER_LIST" >> $GITHUB_ENV
-        echo "TF_VAR_image_tag=$IMAGE_TAG" >> $GITHUB_ENV
-        
+        echo "📊 Found $CONSUMER_COUNT consumer(s): $CONSUMER_LIST"
+        echo "🏷️  Image tag: $IMAGE_TAG"
 
-    - name: Install Terraform
+        # Export to GitHub environment
+        {
+          echo "CONSUMER_LIST=$CONSUMER_LIST"
+          echo "IMAGE_TAG=$IMAGE_TAG" 
+          echo "TF_VAR_consumer_services=$CONSUMER_LIST"
+          echo "TF_VAR_image_tag=$IMAGE_TAG"
+        } >> $GITHUB_ENV
+
+    - name: 🛠️ Setup Terraform
       uses: hashicorp/setup-terraform@v3
 
-    - name: Terraform Init & Apply ECR Repos
+    - name: 🔍 Terraform Validation & Linting
       working-directory: terraform
       run: |
+        echo "🔧 Initializing Terraform..."
         terraform init -input=false
+        
+        echo "✅ Validating Terraform configuration..."
+        terraform validate
+        
+        echo "📋 Formatting check..."
+        if ! terraform fmt -check -recursive; then
+          echo "❌ Terraform files need formatting. Run 'terraform fmt -recursive'"
+          exit 1
+        fi
+        
+        echo "✅ Terraform validation completed"
+
+    - name: 🏗️ Deploy ECR Repositories
+      working-directory: terraform
+      run: |
+        echo "📊 Planning ECR repository changes..."
+        terraform plan -input=false -target=aws_ecr_repository.cdc_consumer_orchestrator
+        
+        echo "🚀 Creating ECR repositories..."
         terraform apply -input=false -auto-approve \
           -target=aws_ecr_repository.cdc_consumer_orchestrator
+        
+        echo "✅ ECR repositories ready"
 
-    - name: Build & Push Docker Images
+    - name: 🐳 Build & Push Docker Images
       run: |
-        for consumer in $(echo $CONSUMER_LIST | jq -r '.[]'); do
+        echo "🐳 Building and pushing Docker images..."
+        
+        if [ "$CONSUMER_LIST" = "[]" ]; then
+          echo "⚠️  No consumers found - skipping Docker operations"
+          exit 0
+        fi
+        
+        CONSUMER_ARRAY=$(echo $CONSUMER_LIST | jq -r '.[]')
+        TOTAL_CONSUMERS=$(echo $CONSUMER_LIST | jq length)
+        CURRENT=0
+        
+        for consumer in $CONSUMER_ARRAY; do
+          CURRENT=$((CURRENT + 1))
           REPO="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${PROJECT_NAME}-${consumer}"
-          echo "Building & Pushing $consumer:$IMAGE_TAG"
+          
+          echo "📦 [$CURRENT/$TOTAL_CONSUMERS] Processing: $consumer"
+          echo "🏷️  Target: $REPO:$IMAGE_TAG"
+          
+          # Verify Dockerfile exists
+          if [ ! -f "consumer_scripts/$consumer/Dockerfile" ]; then
+            echo "❌ ERROR: Dockerfile not found in consumer_scripts/$consumer/"
+            exit 1
+          fi
+          
+          # Build image
+          echo "🔨 Building Docker image..."
           docker build --platform linux/arm64 -t "$REPO:$IMAGE_TAG" "consumer_scripts/$consumer"
+          
+          # Login to ECR
+          echo "🔐 Authenticating with ECR..."
           aws ecr get-login-password --region $AWS_REGION \
             | docker login --username AWS --password-stdin "$REPO"
+          
+          # Push image
+          echo "📤 Pushing to ECR..."
           docker push "$REPO:$IMAGE_TAG"
+          
+          echo "✅ Successfully processed $consumer"
         done
+        
+        echo ""
+        echo "🎉 All Docker images built and pushed successfully!"
 
-    - name: Terraform Plan
+    - name: 📋 Generate Deployment Plan
       working-directory: terraform
       run: |
+        echo "📋 Generating Terraform deployment plan..."
         terraform plan -input=false -out=tfplan
-
-
-    - name: Terraform Apply + Deploy Consumers
+        
+    - name: 🚀 Deploy Infrastructure
       working-directory: terraform
       run: |
+        echo "🚀 Applying Terraform changes..."
         terraform apply -input=false -auto-approve tfplan
+        echo "✅ Infrastructure deployment completed"
+
+    - name: 📊 Deployment Summary
+      if: always()
+      run: |
+        echo ""
+        echo "=============================================="
+        echo "📊 DEPLOYMENT SUMMARY"
+        echo "=============================================="
+        echo "📋 Commit: ${{ github.sha }}"
+        echo "🏷️  Image Tag: ${IMAGE_TAG}"
+        echo "🔢 Consumers: $(echo ${CONSUMER_LIST} | jq length)"
+        
+        if [ "${CONSUMER_LIST}" != "[]" ]; then
+          echo "📦 Services Deployed:"
+          echo "${CONSUMER_LIST}" | jq -r '.[] | "  • \(.)"'
+        fi
+        
+        echo "⏰ Completed: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+        
+        if [ "${{ job.status }}" = "success" ]; then
+          echo "✅ Status: SUCCESS"
+          echo "🎉 CDC consumers are now live!"
+        else
+          echo "❌ Status: FAILED"
+          echo "💡 Check logs above for details"
+        fi
+        echo "=============================================="
