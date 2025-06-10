@@ -23,14 +23,6 @@ resource "aws_ecs_task_definition" "cdc_consumer_orchestrator" {
           awslogs-stream-prefix = "ecs"
         }
       }
-
-      healthCheck = {
-        command     = ["CMD-SHELL", "pgrep -f main.py || exit 1"]
-        interval    = 30
-        timeout     = 5
-        retries     = 3
-        startPeriod = 60
-      }
     }
   ])
 
