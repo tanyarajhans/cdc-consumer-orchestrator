@@ -54,7 +54,7 @@ jobs:
       working-directory: terraform
       run: |
         terraform init -input=false
-        terraform apply \
+        terraform apply -input=false \
           -auto-approve \
           -target=aws_ecr_repository.cdc_consumer_orchestrator
 
