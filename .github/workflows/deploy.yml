@@ -35,11 +35,8 @@ jobs:
     - name: Discover consumers and set image tag
       id: discover_consumers_and_set_tag
       run: |
-        CONSUMER_LIST=$(
-            find consumer_scripts -maxdepth 1 -mindepth 1 -type d \
-              -exec basename {} \; \
-            | jq -R . | jq -s .
-        )
+        CONSUMER_LIST=$(find consumer_scripts -maxdepth 1 -mindepth 1 -type d -exec basename {} \; | jq -R . | jq -s . | jq -c .)
+
         echo "Found consumers: $CONSUMER_LIST"
         IMAGE_TAG=${GITHUB_SHA::7}
 
