@@ -13,7 +13,7 @@ resource "aws_ecs_task_definition" "cdc_consumer_orchestrator" {
       name      = each.key
       image     = "${aws_ecr_repository.cdc_consumer_orchestrator[each.key].repository_url}:${var.image_tag}"
       essential = true
-      command   = ["python", "main.py"]
+      command   = ["python", "-u", "main.py"]
 
       logConfiguration = {
         logDriver = "awslogs"
