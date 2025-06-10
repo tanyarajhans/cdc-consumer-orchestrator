@@ -31,8 +31,8 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region:            ${{ env.AWS_REGION }}
     
-    - name: Discover consumers
-      id: discover_consumers
+    - name: Discover consumers and set image tag
+      id: discover_consumers_and_set_tag
       run: |
         CONSUMER_LIST=$(
             find consumer_scripts -maxdepth 1 -mindepth 1 -type d \
@@ -41,6 +41,8 @@ jobs:
         )
         echo "Found consumers: $CONSUMER_LIST"
         echo "CONSUMER_LIST=$LIST" >> $GITHUB_ENV
+        IMAGE_TAG=${GITHUB_SHA::7}
+        echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
 
     - name: Install Terraform
       uses: hashicorp/setup-terraform@v3
@@ -50,12 +52,12 @@ jobs:
       run: |
         terraform init -input=false
         terraform apply -input=false -auto-approve \
+        -var="consumer_services=${CONSUMER_LIST}" \
+        -var="image_tag=${IMAGE_TAG}" \
         -target=aws_ecr_repository.cdc_consumer_orchestrator
 
     - name: Build & Push Docker Images
       run: |
-        IMAGE_TAG=${GITHUB_SHA::7}
-
         for consumer in $(echo $CONSUMER_LIST | jq -r '.[]'); do
           REPO="$ACCOUNT.dkr.ecr.$AWS_REGION.amazonaws.com/$PROJECT_NAME-$consumer"
           echo "Building & Pushing $consumer:$IMAGE_TAG"
@@ -70,7 +72,7 @@ jobs:
       run: |
         terraform plan -input=false \
             -var="consumer_services=${CONSUMER_LIST}" \
-            -var="image_tag=${TAG}" \
+            -var="image_tag=${IMAGE_TAG}" \
             -out=tfplan
 
 
@@ -79,4 +81,4 @@ jobs:
       run: |
         terraform apply -input=false -auto-approve \
           -var="consumer_services=${CONSUMER_LIST}" \
-          -var="image_tag=${TAG}"
+          -var="image_tag=${IMAGE_TAG}"
