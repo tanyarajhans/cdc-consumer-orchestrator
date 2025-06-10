@@ -11,11 +11,16 @@ resource "aws_ecs_task_definition" "cdc_consumer_orchestrator" {
   container_definitions = jsonencode([
     {
       name      = each.key
-      image     = "${aws_ecr_repository.cdc_consumer_orchestrator[each.key].repository_url}:{var.image_tag}"
+      image     = "${aws_ecr_repository.cdc_consumer_orchestrator[each.key].repository_url}:${var.image_tag}"
       essential = true
       command   = ["python", "main.py"]
     }
   ])
+
+  runtime_platform {
+    operating_system_family = "LINUX"
+    cpu_architecture        = "ARM64"
+  }
 
   tags = {
     Name = "${var.project_name}-${each.key}-task"

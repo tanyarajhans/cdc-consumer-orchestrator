@@ -1,0 +1,83 @@
+# This workflow deploys the CDC consumer applications to AWS using Terraform and Docker.
+# It builds Docker images for each consumer script, pushes them to ECR, and applies the Terraform configuration.
+# The workflow is triggered on pushes to the consumer-scripts or terraform directories.
+# The AWS credentials and region are provided through GitHub secrets.
+# The consumer scripts are expected to be in the 'consumer-scripts' directory, and Terraform configurations in the 'terraform' directory.
+
+name: CDC Consumer Deployment
+
+on:
+  push:
+    paths:
+      - 'consumer-scripts/**'
+      - 'terraform/**'
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+  PROJECT_NAME: "cdc-orchestrator"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region:            ${{ env.AWS_REGION }}
+    
+    - name: Discover consumers
+      id: discover_consumers
+      run: |
+        CONSUMER_LIST=$(
+            find consumer_scripts -maxdepth 1 -mindepth 1 -type d \
+              -exec basename {} \; \
+            | jq -R . | jq -s .
+        )
+        echo "Found consumers: $CONSUMER_LIST"
+        echo "CONSUMER_LIST=$LIST" >> $GITHUB_ENV
+
+    - name: Install Terraform
+      uses: hashicorp/setup-terraform@v3
+
+    - name: Terraform Init & Apply ECR Repos
+      working-directory: terraform
+      run: |
+        terraform init -input=false
+        terraform apply -auto-approve \
+        -target=aws_ecr_repository.cdc_consumer_orchestrator
+
+    - name: Build & Push Docker Images
+      run: |
+        IMAGE_TAG=${GITHUB_SHA::7}
+
+        for consumer in $(echo $CONSUMER_LIST | jq -r '.[]'); do
+          REPO="$ACCOUNT.dkr.ecr.$AWS_REGION.amazonaws.com/$PROJECT_NAME-$consumer"
+          echo "Building & Pushing $consumer:$IMAGE_TAG"
+          docker build -t "$REPO:$IMAGE_TAG" "consumer_scripts/$consumer"
+          aws ecr get-login-password --region $AWS_REGION \
+            | docker login --username AWS --password-stdin "$REPO"
+          docker push "$REPO:$IMAGE_TAG"
+        done
+
+    - name: Terraform Plan
+      working-directory: terraform
+      run: |
+        terraform plan -input=false \
+            -var="consumer_services=${CONSUMER_LIST}" \
+            -var="image_tag=${TAG}" \
+            -out=tfplan
+
+
+    - name: Terraform Apply + Deploy Consumers
+      working-directory: terraform
+      run: |
+        terraform apply -auto-approve \
+          -var="consumer_services=${CONSUMER_LIST}" \
+          -var="image_tag=${TAG}"
