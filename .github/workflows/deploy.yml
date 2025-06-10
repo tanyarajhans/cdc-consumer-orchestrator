@@ -44,6 +44,9 @@ jobs:
         IMAGE_TAG=${GITHUB_SHA::7}
         echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
 
+        export TF_VAR_consumer_services="${CONSUMER_LIST}"
+        export TF_VAR_image_tag="${IMAGE_TAG}"
+
     - name: Install Terraform
       uses: hashicorp/setup-terraform@v3
 
@@ -51,10 +54,9 @@ jobs:
       working-directory: terraform
       run: |
         terraform init -input=false
-        terraform apply -auto-approve \
-          -target=aws_ecr_repository.cdc_consumer_orchestrator \
-          -var="consumer_services=${CONSUMER_LIST}" \
-          -var="image_tag=${IMAGE_TAG}"
+        terraform apply \
+          -auto-approve \
+          -target=aws_ecr_repository.cdc_consumer_orchestrator
 
     - name: Build & Push Docker Images
       run: |
@@ -70,15 +72,12 @@ jobs:
     - name: Terraform Plan
       working-directory: terraform
       run: |
-        terraform plan \
-          -var="consumer_services=${CONSUMER_LIST}" \
-          -var="image_tag=${IMAGE_TAG}" \
+        terraform plan -input=false \
           -out=tfplan
 
 
     - name: Terraform Apply + Deploy Consumers
       working-directory: terraform
       run: |
-        terraform apply -auto-approve \
-          -var="consumer_services=${CONSUMER_LIST}" \
-          -var="image_tag=${IMAGE_TAG}"
+        terraform apply \
+          -auto-approve
