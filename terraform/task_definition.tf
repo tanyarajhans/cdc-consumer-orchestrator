@@ -8,6 +8,15 @@ resource "aws_ecs_task_definition" "cdc_consumer_orchestrator" {
   requires_compatibilities = ["FARGATE"]
   execution_role_arn       = aws_iam_role.cdc_consumer_orchestrator.arn
 
+  log_configuration {
+    log_driver = "awslogs"
+    options = {
+      awslogs-group         = "/ecs/cdc-consumer"
+      awslogs-region        = var.aws_region
+      awslogs-stream-prefix = "ecs"
+    }
+  }
+
   container_definitions = jsonencode([
     {
       name      = each.key
