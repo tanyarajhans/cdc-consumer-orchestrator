@@ -62,7 +62,7 @@ jobs:
         for consumer in $(echo $CONSUMER_LIST | jq -r '.[]'); do
           REPO="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${PROJECT_NAME}-${consumer}"
           echo "Building & Pushing $consumer:$IMAGE_TAG"
-          docker build -t "$REPO:$IMAGE_TAG" "consumer_scripts/$consumer"
+          docker build --platform linux/arm64 -t "$REPO:$IMAGE_TAG" "consumer_scripts/$consumer"
           aws ecr get-login-password --region $AWS_REGION \
             | docker login --username AWS --password-stdin "$REPO"
           docker push "$REPO:$IMAGE_TAG"

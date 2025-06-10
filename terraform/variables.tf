@@ -19,7 +19,7 @@ variable "public_subnets_cidr" {
 }
 
 variable "consumer_services" {
-  type    = list(string)
+  type = list(string)
 }
 
 variable "desired_count" {
